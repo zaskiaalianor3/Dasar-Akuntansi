@@ -86,14 +86,14 @@ def rupiah(x):
 
 # ===================== SIDEBAR =====================
 menu = st.sidebar.selectbox(
-    "Menu",
+    "📂 Menu",
     [
-        "Home & Jurnal",
-        "Lihat Semua",
-        "Buku Besar",
-        "Laba Rugi",
-        "Neraca",
-        "Export Excel"
+        "🏠 Home & Jurnal",
+        "📑 Lihat Semua",
+        "📗 Buku Besar",
+        "📊 Laba Rugi",
+        "⚖️ Neraca",
+        "💾 Export Excel"
     ]
 )
 
@@ -109,7 +109,25 @@ if menu == "Home & Jurnal":
     col1.metric("Total Transaksi", len(df))
     col2.metric("Total Debit", rupiah(df[df["Posisi"] == "Debit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
     col3.metric("Total Kredit", rupiah(df[df["Posisi"] == "Kredit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
+    
+    st.subheader("📊 Grafik Transaksi")
 
+if not df.empty:
+    grafik = (
+        df.groupby("Posisi")["Jumlah"]
+        .sum()
+        .reset_index()
+    )
+
+    st.bar_chart(
+        grafik,
+        x="Posisi",
+        y="Jumlah",
+        color="#2563EB"
+    )
+else:
+    st.info("Belum ada data untuk grafik")
+    
     st.divider()
 
     # ===== FORM JURNAL =====
