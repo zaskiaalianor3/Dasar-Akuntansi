@@ -9,54 +9,6 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# ===================== CSS MODERN (BIRU PUTIH) =====================
-st.markdown("""
-<style>
-/* ===== Background App ===== */
-.stApp {
-    background-color: #F8FAFC;
-}
-
-/* ===== Sidebar ===== */
-section[data-testid="stSidebar"] {
-    background-color: #1E3A8A;
-}
-
-/* Default teks sidebar */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* ===== RADIO MENU ===== */
-div[data-testid="stRadio"] > div {
-    background-color: white;
-    border-radius: 14px;
-    padding: 10px;
-}
-
-/* Item menu */
-div[data-testid="stRadio"] label {
-    padding: 12px 16px;
-    border-radius: 10px;
-    font-weight: 600;
-    color: #1E293B !important;
-}
-
-/* HOVER */
-div[data-testid="stRadio"] label:hover {
-    background-color: #E0E7FF;
-    color: #1E3A8A !important;
-}
-
-/* ITEM TERPILIH (INI YANG PENTING) */
-div[data-testid="stRadio"] label[data-selected="true"] {
-    background-color: #2563EB !important;
-    color: white !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
 # ===================== SESSION STATE =====================
 if "data" not in st.session_state:
     st.session_state.data = []
@@ -86,14 +38,14 @@ def rupiah(x):
 
 # ===================== SIDEBAR =====================
 menu = st.sidebar.selectbox(
-    "📂 Menu",
+    "Menu",
     [
-        "🏠 Home & Jurnal",
-        "📑 Lihat Semua",
-        "📗 Buku Besar",
-        "📊 Laba Rugi",
-        "⚖️ Neraca",
-        "💾 Export Excel"
+        "Home & Jurnal",
+        "Lihat Semua",
+        "Buku Besar",
+        "Laba Rugi",
+        "Neraca",
+        "Export Excel"
     ]
 )
 
@@ -109,24 +61,6 @@ if menu == "Home & Jurnal":
     col1.metric("Total Transaksi", len(df))
     col2.metric("Total Debit", rupiah(df[df["Posisi"] == "Debit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
     col3.metric("Total Kredit", rupiah(df[df["Posisi"] == "Kredit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
-    
-    st.subheader("📊 Grafik Transaksi")
-
-if not df.empty:
-    grafik = (
-        df.groupby("Posisi")["Jumlah"]
-        .sum()
-        .reset_index()
-    )
-
-    st.bar_chart(
-        grafik,
-        x="Posisi",
-        y="Jumlah",
-        color="#2563EB"
-    )
-else:
-    st.info("Belum ada data untuk grafik")
     
     st.divider()
 
