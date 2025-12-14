@@ -86,7 +86,6 @@ if menu == "Home & Jurnal":
                     "Jumlah": jumlah
                 })
                 st.success("Transaksi berhasil disimpan")
-                st.experimental_rerun()
 
     # ===== TABEL JURNAL =====
     st.divider()
