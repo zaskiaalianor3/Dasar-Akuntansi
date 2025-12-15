@@ -4,28 +4,58 @@ from io import BytesIO
 
 # ===================== KONFIGURASI =====================
 st.set_page_config(
-    page_title="Aplikasi Akuntansi",
+    page_title="Aplikasi Laporan Keuangan",
     layout="wide",
     page_icon="📊"
 )
 
-# ===================== SESSION STATE =====================
+# ===================== CSS UI =====================
+st.markdown("""
+<style>
+.main { background-color: #f8f9fa; }
+h1, h2, h3 { color: #2c3e50; }
+.card {
+    padding: 20px;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+section[data-testid="stSidebar"] {
+    background-color: #ffffff;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ===================== SESSION =====================
 if "data" not in st.session_state:
     st.session_state.data = []
 
-if "edit_index" not in st.session_state:
-    st.session_state.edit_index = None
+# ===================== MODE =====================
+mode = st.sidebar.radio(
+    "Mode Tampilan",
+    ["Mode Tugas Dasar", "Mode Aplikasi Sederhana"]
+)
 
-# ===================== MASTER JENIS AKUN =====================
+def info_tugas(teks):
+    if mode == "Mode Tugas Dasar":
+        st.info(teks)
+
+# ===================== MASTER AKUN =====================
 JENIS_AKUN_MAP = {
     "kas": "Aset",
+    "bank": "Aset",
     "piutang": "Aset",
-    "perlengkapan": "Aset",
+
     "utang": "Kewajiban",
     "utang usaha": "Kewajiban",
+
     "modal": "Ekuitas",
+    "prive": "Ekuitas",
+
     "pendapatan": "Pendapatan",
     "penjualan": "Pendapatan",
+
     "beban": "Beban",
     "belanja": "Beban"
 }
@@ -36,271 +66,225 @@ def jenis_akun(akun):
 def rupiah(x):
     return f"Rp {x:,.0f}".replace(",", ".")
 
-# ===================== SIDEBAR =====================
+# ===================== LOGIKA AKUNTANSI =====================
+def hitung_laba_rugi(df):
+    pendapatan = df[(df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")]["Jumlah"].sum()
+    beban = df[(df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")]["Jumlah"].sum()
+    return pendapatan, beban, pendapatan - beban
+
+def hitung_saldo(row):
+    if row["Jenis Akun"] in ["Aset", "Beban"]:
+        return row["Jumlah"] if row["Posisi"] == "Debit" else -row["Jumlah"]
+    else:
+        return row["Jumlah"] if row["Posisi"] == "Kredit" else -row["Jumlah"]
+
+# ===================== MENU =====================
 menu = st.sidebar.selectbox(
     "Menu",
-    [
-        "Home & Jurnal",
-        "Lihat Semua",
-        "Buku Besar",
-        "Laba Rugi",
-        "Neraca",
-        "Export Excel"
-    ]
+    ["Jurnal Umum", "Buku Besar", "Laba Rugi", "Neraca", "Lihat Semua", "Export Excel"]
 )
 
 df = pd.DataFrame(st.session_state.data)
 
-# ===================== HOME + JURNAL UMUM =====================
-if menu == "Home & Jurnal":
-    st.title("APLIKASI AKUNTANSI SEDERHANA")
-    st.write("Input transaksi dan lihat laporan secara otomatis")
+# ===================== JURNAL UMUM =====================
+if menu == "Jurnal Umum":
+    st.markdown("<h1> Jurnal Umum</h1>", unsafe_allow_html=True)
+    info_tugas("Jurnal umum digunakan untuk mencatat seluruh transaksi keuangan berdasarkan debit dan kredit.")
 
-    # ===== DASHBOARD =====
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Transaksi", len(df))
-    col2.metric("Total Debit", rupiah(df[df["Posisi"] == "Debit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
-    col3.metric("Total Kredit", rupiah(df[df["Posisi"] == "Kredit"]["Jumlah"].sum()) if not df.empty else "Rp 0")
-    
-    st.divider()
-
-    # ===== FORM JURNAL =====
-    st.subheader("Input Jurnal Umum")
-    with st.container(border=True):
-        with st.form("form_jurnal"):
-            col1, col2 = st.columns(2)
-            with col1:
-                tanggal = st.date_input("Tanggal")
-                akun = st.text_input("Nama Akun")
-            with col2:
-                posisi = st.radio("Posisi", ["Debit", "Kredit"], horizontal=True)
-                jumlah = st.number_input("Jumlah", min_value=0.0)
-
-            simpan = st.form_submit_button("Simpan Transaksi")
-
-            if simpan:
-                st.session_state.data.append({
-                    "Tanggal": tanggal,
-                    "Akun": akun,
-                    "Posisi": posisi,
-                    "Jumlah": jumlah
-                })
-                st.success("Transaksi berhasil disimpan")
-
-    # ===== TABEL JURNAL =====
-    st.divider()
-    st.subheader("Jurnal Umum")
-
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
-
-        st.subheader("Edit / Hapus Transaksi")
-        pilih = st.selectbox("Pilih Transaksi", df.index)
-
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    with st.form("form_jurnal"):
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Hapus"):
-                st.session_state.data.pop(pilih)
-                st.experimental_rerun()
-
+            tanggal = st.date_input("Tanggal")
+            akun = st.text_input("Nama Akun")
         with col2:
-            if st.button("Edit"):
-                st.session_state.edit_index = pilih
+            posisi = st.radio("Posisi", ["Debit", "Kredit"])
+            jumlah = st.number_input("Jumlah", min_value=0.0)
 
-        if st.session_state.edit_index == pilih:
-            row = df.loc[pilih]
-            with st.form("form_edit"):
-                tgl = st.date_input("Tanggal", row["Tanggal"])
-                akun_baru = st.text_input("Akun", row["Akun"])
-                posisi_baru = st.radio(
-                    "Posisi",
-                    ["Debit", "Kredit"],
-                    index=0 if row["Posisi"] == "Debit" else 1
-                )
-                jumlah_baru = st.number_input("Jumlah", value=row["Jumlah"])
+        simpan = st.form_submit_button("Simpan")
+        if simpan:
+            st.session_state.data.append({
+                "Tanggal": tanggal,
+                "Akun": akun,
+                "Posisi": posisi,
+                "Jumlah": jumlah
+            })
+            st.success("Transaksi berhasil disimpan")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-                update = st.form_submit_button("Update")
-                if update:
-                    st.session_state.data[pilih] = {
-                        "Tanggal": tgl,
-                        "Akun": akun_baru,
-                        "Posisi": posisi_baru,
-                        "Jumlah": jumlah_baru
-                    }
-                    st.session_state.edit_index = None
-                    st.experimental_rerun()
-    else:
-        st.info("Belum ada transaksi")
-
-# ===================== LIHAT SEMUA =====================
-elif menu == "Lihat Semua":
-    st.title("Semua Laporan")
-
-    if df.empty:
-        st.warning("Belum ada transaksi")
-    else:
-        df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
-        df["Debit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else 0, axis=1)
-        df["Kredit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Kredit" else 0, axis=1)
-        df["Saldo"] = df["Debit"] - df["Kredit"]
-
-        st.subheader("Jurnal Umum")
-        st.dataframe(df[["Tanggal", "Akun", "Posisi", "Jumlah"]], use_container_width=True)
-
-        st.subheader("Buku Besar")
-        buku_besar = df.groupby(["Jenis Akun", "Akun"])[["Debit", "Kredit", "Saldo"]].sum().reset_index()
-        st.dataframe(buku_besar, use_container_width=True)
-
-        st.subheader("Laba Rugi")
-        pendapatan = df[(df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")]["Jumlah"].sum()
-        beban = df[(df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")]["Jumlah"].sum()
-        laba = pendapatan - beban
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Pendapatan", rupiah(pendapatan))
-        col2.metric("Beban", rupiah(beban))
-        col3.metric("Laba Bersih", rupiah(laba))
-
-        st.subheader("Neraca")
-        neraca = df.groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
-
-        col1, col2 = st.columns(2)
-        col1.dataframe(neraca[neraca["Jenis Akun"] == "Aset"], use_container_width=True)
-        col2.dataframe(
-            neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])],
-            use_container_width=True
-        )
+    if not df.empty:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Data Jurnal")
+        st.dataframe(df, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ===================== BUKU BESAR =====================
 elif menu == "Buku Besar":
-    st.title("Buku Besar")
+    st.markdown("<h1> Buku Besar</h1>", unsafe_allow_html=True)
+    info_tugas("Buku besar mengelompokkan transaksi ke masing-masing akun untuk mengetahui saldo.")
+
     if not df.empty:
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
         df["Debit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else 0, axis=1)
         df["Kredit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Kredit" else 0, axis=1)
+        df["Saldo"] = df.apply(hitung_saldo, axis=1)
+
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.dataframe(
-            df.groupby(["Jenis Akun", "Akun"])[["Debit", "Kredit"]].sum().reset_index(),
+            df.groupby(["Jenis Akun", "Akun"])[["Debit", "Kredit", "Saldo"]].sum().reset_index(),
             use_container_width=True
         )
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("Belum ada transaksi")
 
 # ===================== LABA RUGI =====================
 elif menu == "Laba Rugi":
-    st.title("Laporan Laba Rugi")
+    st.markdown("<h1> Laporan Laba Rugi</h1>", unsafe_allow_html=True)
+    info_tugas("Laporan laba rugi menunjukkan perbandingan pendapatan dan beban dalam satu periode.")
+
     if not df.empty:
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
-        pendapatan = df[(df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")]["Jumlah"].sum()
-        beban = df[(df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")]["Jumlah"].sum()
-        st.metric("Laba Bersih", rupiah(pendapatan - beban))
+        pendapatan, beban, laba = hitung_laba_rugi(df)
+
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Pendapatan", rupiah(pendapatan))
+        col2.metric("Beban", rupiah(beban))
+        col3.metric("Laba Bersih", rupiah(laba))
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("Belum ada transaksi")
 
-# ===================== NERACA =====================
-def hitung_laba_bersih(df):
-    pendapatan = df[
-        (df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")
-    ]["Jumlah"].sum()
-
-    beban = df[
-        (df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")
-    ]["Jumlah"].sum()
-
-    return pendapatan, beban, pendapatan - beban
-
+# ===================== NERACA (OPSI 3) =====================
 elif menu == "Neraca":
-    st.title("Neraca")
+    st.markdown("<h1> Neraca</h1>", unsafe_allow_html=True)
+    info_tugas(
+        "Neraca disajikan setelah penutupan periode. "
+        "Pendapatan dan beban telah ditutup ke ekuitas (laba ditahan)."
+    )
 
     if not df.empty:
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
+        df["Saldo"] = df.apply(hitung_saldo, axis=1)
 
-        # Hitung saldo
-        df["Saldo"] = df.apply(
-            lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else -x["Jumlah"],
-            axis=1
-        )
+        pendapatan, beban, laba = hitung_laba_rugi(df)
 
-        # Hitung laba bersih
-        pendapatan, beban, laba_bersih = hitung_laba_bersih(df)
+        neraca = df[df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])] \
+            .groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
 
-        # Neraca dasar (Aset, Kewajiban, Ekuitas)
-        neraca = df[
-            df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])
-        ].groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
-
-        # Tambahkan laba bersih ke Ekuitas
         neraca = pd.concat([
             neraca,
             pd.DataFrame([{
                 "Jenis Akun": "Ekuitas",
-                "Akun": "Laba Bersih",
-                "Saldo": laba_bersih
+                "Akun": "Laba Ditahan",
+                "Saldo": laba
             }])
         ], ignore_index=True)
 
-        # ===== TAMPILAN =====
         col1, col2 = st.columns(2)
 
-        col1.subheader("ASET")
-        col1.dataframe(
-            neraca[neraca["Jenis Akun"] == "Aset"],
-            use_container_width=True
-        )
+        with col1:
+            st.markdown("<div class='card'>", unsafe_allow_html=True)
+            st.subheader("ASET")
+            aset = neraca[neraca["Jenis Akun"] == "Aset"]
+            st.dataframe(aset, use_container_width=True)
+            st.metric("Total Aset", rupiah(aset["Saldo"].sum()))
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        col2.subheader("KEWAJIBAN & EKUITAS")
-        col2.dataframe(
-            neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])],
-            use_container_width=True
-        )
+        with col2:
+            st.markdown("<div class='card'>", unsafe_allow_html=True)
+            st.subheader("KEWAJIBAN & EKUITAS")
+            kew_eku = neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])]
+            st.dataframe(kew_eku, use_container_width=True)
+            st.metric("Total Kewajiban + Ekuitas", rupiah(kew_eku["Saldo"].sum()))
+            st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.info("Belum ada transaksi")
 
-        st.divider()
+# ===================== LIHAT SEMUA =====================
+elif menu == "Lihat Semua":
+    st.markdown("<h1> Lihat Semua Laporan</h1>", unsafe_allow_html=True)
 
-        # Informasi Pendukung
-        st.subheader("Ringkasan Laba Rugi")
+    info_tugas(
+        "Halaman ini menampilkan seluruh proses akuntansi mulai dari jurnal umum, "
+        "buku besar, laporan laba rugi, hingga neraca setelah penutupan."
+    )
+
+    if not df.empty:
+        # ===== PREPARASI DATA =====
+        df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
+        df["Debit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else 0, axis=1)
+        df["Kredit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Kredit" else 0, axis=1)
+        df["Saldo"] = df.apply(hitung_saldo, axis=1)
+
+        pendapatan, beban, laba = hitung_laba_rugi(df)
+
+        # ===== JURNAL UMUM =====
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Jurnal Umum")
+        st.dataframe(df[["Tanggal", "Akun", "Posisi", "Jumlah"]], use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ===== BUKU BESAR =====
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Buku Besar")
+        buku_besar = df.groupby(["Jenis Akun", "Akun"])[["Debit", "Kredit", "Saldo"]].sum().reset_index()
+        st.dataframe(buku_besar, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ===== LABA RUGI =====
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Laporan Laba Rugi")
         col1, col2, col3 = st.columns(3)
         col1.metric("Pendapatan", rupiah(pendapatan))
         col2.metric("Beban", rupiah(beban))
-        col3.metric("Laba Bersih", rupiah(laba_bersih))
+        col3.metric("Laba Bersih", rupiah(laba))
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ===== NERACA =====
+        neraca = df[df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])] \
+            .groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
+
+        neraca = pd.concat([
+            neraca,
+            pd.DataFrame([{
+                "Jenis Akun": "Ekuitas",
+                "Akun": "Laba Ditahan",
+                "Saldo": laba
+            }])
+        ], ignore_index=True)
+
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Neraca (Setelah Penutupan)")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**ASET**")
+            st.dataframe(neraca[neraca["Jenis Akun"] == "Aset"], use_container_width=True)
+
+        with col2:
+            st.markdown("**KEWAJIBAN & EKUITAS**")
+            st.dataframe(
+                neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])],
+                use_container_width=True
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         st.info("Belum ada transaksi")
 
-
-# ===================== EXPORT EXCEL =====================
+# ===================== EXPORT =====================
 elif menu == "Export Excel":
     st.title("Export Excel")
 
-    if df.empty:
-        st.warning("Belum ada data")
-    else:
+    if not df.empty:
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
-        df["Debit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else 0, axis=1)
-        df["Kredit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Kredit" else 0, axis=1)
-        df["Saldo"] = df["Debit"] - df["Kredit"]
-
-        buku_besar = df.groupby(["Jenis Akun", "Akun"])[["Debit", "Kredit", "Saldo"]].sum().reset_index()
-        neraca = df.groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
-
-        laba_rugi = pd.DataFrame({
-            "Keterangan": ["Pendapatan", "Beban", "Laba Bersih"],
-            "Jumlah": [
-                df[(df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")]["Jumlah"].sum(),
-                df[(df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")]["Jumlah"].sum(),
-                (df[(df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")]["Jumlah"].sum()
-                 - df[(df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")]["Jumlah"].sum())
-            ]
-        })
+        df["Saldo"] = df.apply(hitung_saldo, axis=1)
+        pendapatan, beban, laba = hitung_laba_rugi(df)
 
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df[["Tanggal", "Akun", "Posisi", "Jumlah"]].to_excel(writer, "Jurnal Umum", index=False)
-            buku_besar.to_excel(writer, "Buku Besar", index=False)
-            laba_rugi.to_excel(writer, "Laba Rugi", index=False)
-            neraca.to_excel(writer, "Neraca", index=False)
-
-        st.download_button(
-            "Download Excel",
-            data=output.getvalue(),
-            file_name="laporan_akuntansi.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            df.to_excel(writer, "Jurnal Umum", index=False)
+        st.download_button("Download Excel", output.getvalue(), "laporan.xlsx")
