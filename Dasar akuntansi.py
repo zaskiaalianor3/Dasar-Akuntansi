@@ -197,17 +197,74 @@ elif menu == "Laba Rugi":
         st.info("Belum ada transaksi")
 
 # ===================== NERACA =====================
+def hitung_laba_bersih(df):
+    pendapatan = df[
+        (df["Jenis Akun"] == "Pendapatan") & (df["Posisi"] == "Kredit")
+    ]["Jumlah"].sum()
+
+    beban = df[
+        (df["Jenis Akun"] == "Beban") & (df["Posisi"] == "Debit")
+    ]["Jumlah"].sum()
+
+    return pendapatan, beban, pendapatan - beban
+
 elif menu == "Neraca":
     st.title("Neraca")
+
     if not df.empty:
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
-        df["Saldo"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else -x["Jumlah"], axis=1)
-        st.dataframe(
-            df.groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index(),
+
+        # Hitung saldo
+        df["Saldo"] = df.apply(
+            lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else -x["Jumlah"],
+            axis=1
+        )
+
+        # Hitung laba bersih
+        pendapatan, beban, laba_bersih = hitung_laba_bersih(df)
+
+        # Neraca dasar (Aset, Kewajiban, Ekuitas)
+        neraca = df[
+            df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])
+        ].groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
+
+        # Tambahkan laba bersih ke Ekuitas
+        neraca = pd.concat([
+            neraca,
+            pd.DataFrame([{
+                "Jenis Akun": "Ekuitas",
+                "Akun": "Laba Bersih",
+                "Saldo": laba_bersih
+            }])
+        ], ignore_index=True)
+
+        # ===== TAMPILAN =====
+        col1, col2 = st.columns(2)
+
+        col1.subheader("ASET")
+        col1.dataframe(
+            neraca[neraca["Jenis Akun"] == "Aset"],
             use_container_width=True
         )
+
+        col2.subheader("KEWAJIBAN & EKUITAS")
+        col2.dataframe(
+            neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])],
+            use_container_width=True
+        )
+
+        st.divider()
+
+        # Informasi Pendukung
+        st.subheader("Ringkasan Laba Rugi")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Pendapatan", rupiah(pendapatan))
+        col2.metric("Beban", rupiah(beban))
+        col3.metric("Laba Bersih", rupiah(laba_bersih))
+
     else:
         st.info("Belum ada transaksi")
+
 
 # ===================== EXPORT EXCEL =====================
 elif menu == "Export Excel":
