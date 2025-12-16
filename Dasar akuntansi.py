@@ -144,8 +144,11 @@ elif menu == "Laba Rugi":
     info_tugas("Laporan laba rugi menunjukkan perbandingan pendapatan dan beban dalam satu periode.")
 
     if not df.empty:
-        df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
-        pendapatan, beban, laba = hitung_laba_rugi(df)
+       def hitung_laba_rugi(df):
+        pendapatan = df[df["Jenis Akun"] == "Pendapatan"]["Saldo"].sum()
+        beban = df[df["Jenis Akun"] == "Beban"]["Saldo"].sum()
+        laba = pendapatan - beban
+        return pendapatan, beban, laba
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
