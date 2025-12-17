@@ -12,17 +12,49 @@ st.set_page_config(
 # ===================== CSS UI =====================
 st.markdown("""
 <style>
-.main { background-color: #f8f9fa; }
-h1, h2, h3 { color: #2c3e50; }
+/* Background */
+.stApp {
+    background-color: #f5f7fb;
+}
+
+/* Card style */
 .card {
-    padding: 20px;
-    border-radius: 12px;
     background: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
     margin-bottom: 20px;
 }
+
+/* Judul halaman */
+h1 {
+    font-size: 34px;
+    margin-bottom: 5px;
+}
+
+/* Subjudul */
+h2, h3 {
+    margin-top: 10px;
+}
+
+/* Metric */
+[data-testid="metric-container"] {
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px #e5e7eb;
+}
+
+/* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #ffffff;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+}
+
+/* Table */
+.stDataFrame {
+    border-radius: 10px;
+    overflow: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -173,7 +205,7 @@ elif menu == "Laba Rugi":
     else:
         st.info("Belum ada transaksi")
 
-# ===================== NERACA (OPSI 3) =====================
+# ===================== NERACA =====================
 elif menu == "Neraca":
     st.markdown("<h1> Neraca</h1>", unsafe_allow_html=True)
     info_tugas(
@@ -221,7 +253,7 @@ elif menu == "Neraca":
 
 # ===================== LIHAT SEMUA =====================
 elif menu == "Lihat Semua":
-    st.markdown("<h1> Lihat Semua Laporan</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>Lihat Semua Laporan</h1>", unsafe_allow_html=True)
 
     info_tugas(
         "Halaman ini menampilkan seluruh proses akuntansi mulai dari jurnal umum, "
@@ -229,12 +261,29 @@ elif menu == "Lihat Semua":
     )
 
     if not df.empty:
+
+        # ===== FUNGSI LABA RUGI (HARUS DI ATAS) =====
+        def hitung_laba_rugi(df):
+            pendapatan = df[
+                (df["Akun"].str.contains("Pendapatan", case=False)) &
+                (df["Posisi"] == "Kredit")
+            ]["Jumlah"].sum()
+
+            beban = df[
+                (df["Akun"].str.contains("Beban", case=False)) &
+                (df["Posisi"] == "Debit")
+            ]["Jumlah"].sum()
+
+            laba = pendapatan - beban
+            return pendapatan, beban, laba
+
         # ===== PREPARASI DATA =====
         df["Jenis Akun"] = df["Akun"].apply(jenis_akun)
         df["Debit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Debit" else 0, axis=1)
         df["Kredit"] = df.apply(lambda x: x["Jumlah"] if x["Posisi"] == "Kredit" else 0, axis=1)
         df["Saldo"] = df.apply(hitung_saldo, axis=1)
 
+        # ===== HITUNG LABA RUGI =====
         pendapatan, beban, laba = hitung_laba_rugi(df)
 
         # ===== JURNAL UMUM =====
@@ -251,27 +300,14 @@ elif menu == "Lihat Semua":
         st.markdown("</div>", unsafe_allow_html=True)
 
         # ===== LABA RUGI =====
-        def hitung_laba_rugi(df):
-        pendapatan = df[
-            (df["Akun"].str.contains("Pendapatan", case=False)) &
-            (df["Posisi"] == "Kredit")
-        ]["Jumlah"].sum()
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Laporan Laba Rugi")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Pendapatan", rupiah(pendapatan))
+        col2.metric("Beban", rupiah(beban))
+        col3.metric("Laba Bersih", rupiah(laba))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        beban = df[
-            (df["Akun"].str.contains("Beban", case=False)) &
-            (df["Posisi"] == "Debit")
-        ]["Jumlah"].sum()
-
-        laba = pendapatan - beban
-        return pendapatan, beban, laba
-
-    pendapatan, beban, laba = hitung_laba_rugi(df)
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Pendapatan", rupiah(pendapatan))
-    col2.metric("Beban", rupiah(beban))
-    col3.metric("Laba Bersih", rupiah(laba))
-    
         # ===== NERACA =====
         neraca = df[df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])] \
             .groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
@@ -287,8 +323,8 @@ elif menu == "Lihat Semua":
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("Neraca (Setelah Penutupan)")
-        col1, col2 = st.columns(2)
 
+        col1, col2 = st.columns(2)
         with col1:
             st.markdown("**ASET**")
             st.dataframe(neraca[neraca["Jenis Akun"] == "Aset"], use_container_width=True)
@@ -299,7 +335,6 @@ elif menu == "Lihat Semua":
                 neraca[neraca["Jenis Akun"].isin(["Kewajiban", "Ekuitas"])],
                 use_container_width=True
             )
-
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
