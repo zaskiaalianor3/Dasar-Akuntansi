@@ -251,14 +251,27 @@ elif menu == "Lihat Semua":
         st.markdown("</div>", unsafe_allow_html=True)
 
         # ===== LABA RUGI =====
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.subheader("Laporan Laba Rugi")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Pendapatan", rupiah(pendapatan))
-        col2.metric("Beban", rupiah(beban))
-        col3.metric("Laba Bersih", rupiah(laba))
-        st.markdown("</div>", unsafe_allow_html=True)
+        def hitung_laba_rugi(df):
+        pendapatan = df[
+            (df["Akun"].str.contains("Pendapatan", case=False)) &
+            (df["Posisi"] == "Kredit")
+        ]["Jumlah"].sum()
 
+        beban = df[
+            (df["Akun"].str.contains("Beban", case=False)) &
+            (df["Posisi"] == "Debit")
+        ]["Jumlah"].sum()
+
+        laba = pendapatan - beban
+        return pendapatan, beban, laba
+
+    pendapatan, beban, laba = hitung_laba_rugi(df)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Pendapatan", rupiah(pendapatan))
+    col2.metric("Beban", rupiah(beban))
+    col3.metric("Laba Bersih", rupiah(laba))
+    
         # ===== NERACA =====
         neraca = df[df["Jenis Akun"].isin(["Aset", "Kewajiban", "Ekuitas"])] \
             .groupby(["Jenis Akun", "Akun"])["Saldo"].sum().reset_index()
