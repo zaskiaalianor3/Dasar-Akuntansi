@@ -140,15 +140,28 @@ elif menu == "Buku Besar":
 
 # ===================== LABA RUGI =====================
 elif menu == "Laba Rugi":
-    st.markdown("<h1> Laporan Laba Rugi</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>Laporan Laba Rugi</h1>", unsafe_allow_html=True)
     info_tugas("Laporan laba rugi menunjukkan perbandingan pendapatan dan beban dalam satu periode.")
 
     if not df.empty:
-       def hitung_laba_rugi(df):
-        pendapatan = df[df["Jenis Akun"] == "Pendapatan"]["Saldo"].sum()
-        beban = df[df["Jenis Akun"] == "Beban"]["Saldo"].sum()
-        laba = pendapatan - beban
-        return pendapatan, beban, laba
+
+        def hitung_laba_rugi(df):
+            # Pendapatan (akun mengandung 'Pendapatan' dan posisi Kredit)
+            pendapatan = df[
+                (df["Akun"].str.contains("Pendapatan", case=False)) &
+                (df["Posisi"] == "Kredit")
+            ]["Jumlah"].sum()
+
+            # Beban (akun mengandung 'Beban' dan posisi Debit)
+            beban = df[
+                (df["Akun"].str.contains("Beban", case=False)) &
+                (df["Posisi"] == "Debit")
+            ]["Jumlah"].sum()
+
+            laba = pendapatan - beban
+            return pendapatan, beban, laba
+
+        pendapatan, beban, laba = hitung_laba_rugi(df)
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
@@ -156,6 +169,7 @@ elif menu == "Laba Rugi":
         col2.metric("Beban", rupiah(beban))
         col3.metric("Laba Bersih", rupiah(laba))
         st.markdown("</div>", unsafe_allow_html=True)
+
     else:
         st.info("Belum ada transaksi")
 
